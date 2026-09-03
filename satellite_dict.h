@@ -1,4 +1,5 @@
 #include "nlohmann/json.hpp"
+#include <vector>
 using json = nlohmann::json;
 
 struct Entry
@@ -13,7 +14,7 @@ struct Entry
     char * epoch_year;
     char * ballistic_coefficient;
     char * radiation_drag;
-    
+
     Entry(int id, char * s_n, char * s_i, char * ln, char * ly, char * lp
           char * ed, char * ey, char * bc, char * rd) :
           entry_id(id), satellite_name(s_n), satellite_id(s_i), launch_number(ln),
@@ -26,9 +27,11 @@ class SatelliteDictionary
 {
     public:
     SatelliteDictionary();
-    void readEntry();           //reads an entry from the dictionary
-    json accessEntry();         //accesses a JSON object from the dictionary
+    void readEntry();                       //reads an entry from the dictionary
+    json accessEntry();                     //accesses a JSON object from the dictionary
+    void appendToUserDict(json * entry);
     protected:
+    std::vector<Entry> user_satcat;
     json satcat;
     private:
     void generateSatCat();

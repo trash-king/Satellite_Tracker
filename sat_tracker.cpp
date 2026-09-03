@@ -1,5 +1,6 @@
 #include "sat_tracker.h"
 
+
 SatTracker::SatTracker()
 {
 
@@ -17,7 +18,7 @@ static size_t SatTracker::write_callback(char * ptr, size_t size, size_t new_mem
     return size  * new_member;
 }
 
-json SatTracker::getDataFromURL(char * satellite_id)
+json SatTracker::getDataFromURL()
 {
     CURL* curl = curl_easy_init();
     std::string body;
@@ -34,10 +35,15 @@ json SatTracker::getDataFromURL(char * satellite_id)
     curl_easy_cleanup(curl);
 
     if(res != CURLE_OK || status_code != 200) return "";
-    return body;
+    return json::parse(body);
 }
 
 void SatTracker::getSatelliteData(char * satellite_id)
 {
-    json outputData = json::parse(getDataFromURL(char * satellite_id));
+    json outputData = getDataFromURL();
+    char res;
+    std::cout << "Save to Local Dictionary? Y/N"<< std::endl;
+    cin >> res;
+    if(res == "Y") SatelliteDictionary.appendToUserDict(outputData);
+
 }

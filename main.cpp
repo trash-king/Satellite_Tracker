@@ -5,7 +5,8 @@
 #include "satellite_dict.h"
 
 
-SatelliteDictionary sat_dict = SatelliteDictionary();
+inline SatelliteDictionary sat_dict = SatelliteDictionary();
+
 bool is_running  = true;
 
 int main()
@@ -14,7 +15,7 @@ int main()
     while(is_running)
     {
 
-        
+
     }
     curl_global_cleanup();
     return 0;
