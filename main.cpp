@@ -11,12 +11,12 @@ bool is_running  = true;
 
 int main()
 {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
+    //curl_global_init(CURL_GLOBAL_DEFAULT);
     while(is_running)
     {
 
 
     }
-    curl_global_cleanup();
+    //curl_global_cleanup();
     return 0;
 }
