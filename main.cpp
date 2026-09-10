@@ -1,9 +1,10 @@
 #include <iostream>
 #include <string>
-#include "nlohmann.h"
+#include "nlohmann/json.hpp"
 //#include "cpr/cpr.h"
 #include "sat_tracker.h"
 
+using namespace nlohmann;
 
 SatelliteDictionary sat_dict    = SatelliteDictionary();
 SatTracker          sat_track   = SatTracker();
