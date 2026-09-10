@@ -2,6 +2,7 @@
 #include <ostream>
 #include <istream>
 #include "satellite_dict.h"
+#include "nlohmann.h"
 
 SatelliteDictionary::SatelliteDictionary()
 {
@@ -47,15 +48,15 @@ Entry SatelliteDictionary::accessEntry(int entry)
 void SatelliteDictionary::appendToUserDict(json * entry)
 {
 
-    *entry["satid"] =        user_satcat[0].satellite_id;
-    *entry["satname"] =      user_satcat[0].satellite_name;
-    *entry["satlatitude"] =  user_satcat[0].latitude;
-    *entry["satlongitude"] = user_satcat[0].longitude;
-    *entry["azimuth"] =      user_satcat[0].azimuth;
-    *entry["elevation"] =    user_satcat[0].elevation;
-    *entry["ra"] =           user_satcat[0].ra;
-    *entry["dec"] =          user_satcat[0].declination;
-    *entry["timestamp"] =    user_satcat[0].timestamp;
+    entry["satid"] =        user_satcat[0].satellite_id;
+    entry["satname"] =      user_satcat[0].satellite_name;
+    entry["satlatitude"] =  user_satcat[0].latitude;
+    entry["satlongitude"] = user_satcat[0].longitude;
+    entry["azimuth"] =      user_satcat[0].azimuth;
+    entry["elevation"] =    user_satcat[0].elevation;
+    entry["ra"] =           user_satcat[0].ra;
+    entry["dec"] =          user_satcat[0].declination;
+    entry["timestamp"] =    user_satcat[0].timestamp;
 }
 
 void SatelliteDictionary::generateSatCat()

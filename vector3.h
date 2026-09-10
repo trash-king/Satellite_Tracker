@@ -26,3 +26,8 @@ struct vector3{
     }
 
 };
+
+vector3 scalar_division(vector3 numer, double denom)
+{
+    return vector3(numer.x / denom, numer.y/denom, numer.z/denom);
+}

@@ -1,5 +1,7 @@
 #include <cmath>
-#include <curl/curl.h>
+//#include <curl/curl.h>
+#include "satellite_dict.h"
+#include "orbital_math.h"
 #include <string>
 #include <iostream>
 

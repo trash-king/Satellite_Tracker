@@ -172,24 +172,75 @@ vector3 generate_ECEF_vector(double longitude, double latitude, double altitude)
 
 
 
-vector3 generate_ECI_vector(vector3 ecef_vector)        //earth-centered initial
+vector3 generate_ECI_vector(vector3 ecef_vector)                                //earth-centered initial
 {
     vector3 eci_vector;
-    double g_time = gmst();
+    double g_time = gmst() * (M_PI/180);
     eci_vector.x = (ecef_vector.x * cos(g_time) - ecef_vector.y * sin(g_time)); //X
     eci_vector.y = (ecef_vector.x * sin(g_time) + ecef_vector.y * cos(g_time)); //Y
     eci_vector.z = (ecef_vector.z);                                             //Z
 
     return eci_vector;
 }
+
+vector3 generate_ECI_vector(vector3 ecef_vector, double timestamp)              //earth-centered initial at specified timestamp
+{
+    vector3 eci_vector;
+    double g_time = timestamp * (M_PI/180);
+    eci_vector.x = (ecef_vector.x * cos(g_time) - ecef_vector.y * sin(g_time)); //X
+    eci_vector.y = (ecef_vector.x * sin(g_time) + ecef_vector.y * cos(g_time)); //Y
+    eci_vector.z = (ecef_vector.z);                                             //Z
+
+    return eci_vector;   
+}
+
+vector3 generate_ECEF_at_position(vector3 snapshot1, vector3 snapshot2, double t1, double t2)
+{
+    //snapshot 1 is lat/long/alt t1 - timestamp 1
+    //snapshot 2 is lat/long/alt t2 - timestamp 2
+    //t1 and t2 are the timestamps themselves
+    vector3 s1 = generate_ECEF_vector(snapshot1.x, snapshot1.y, snapshot1.z);
+    vector3 s2 = generate_ECEF_vector(snapshot2.x, snapshot2.y, snapshot2.z);
+
+    s1 = generate_ECI_vector(s1, t1);
+    s2 = generate_ECI_vector(s2, t2);
+
+    return scalar_division((s2 - s1), (t2 - t1));
+}
+
+
+//rECI is the result of generate_ECI_vector
+
+/*
+how to calculate rECEF: rECEF is the velocity vector of Earth-Centered Earth-Fixed
+rotation. This is the velocity of the rotation of ECEF. Earth-Centered Earth Fixed vector rotates at a velocity ofX
+
+vECEF = r*ECEF(t2) - r*ECEF(t1)/t2- t1
+What this means is to take the rotational vector of ECEF at two specific points in time, then find the
+rate between the two points.
+Or we can pull it from Celestrack or some other source. THis is the ECEF of Earth, it doesn't change
+
+*/
+
 //ECI is non-rotating, but ECEF rotates with Earth
 //ECI is fixed, while ECEF is not fixed
+
+//vECI - ECI velocity vector. This is a velocity vector relative to Earth's rotation rate
+//vECI = R(θ) (R theta is A rotation matrix, vector R rotated by angle theta. Theta refers to Greenwich Mean Sidereal Time)
+//R(theta) = generate_ECI_vector
+
+//vECI (velocity vector) = generate_ECI_vector * vECEF + Earth's rotation rate * rECI
+
 
 /*
 X = (N+h)cos o cos lambda
 Y = (N+h)cos o sin lambda
 Z = (N(1-e^2)+h)sin o
 
+ωE ≈7.292115×10^-5 rad/s, Earth's rotation rate. Earth rotates at a rate of 7.292115x10^-5 radians per second
+This is measured relative to the stars (sidereal) as opposed to the sun.
+E
+	​
 
 Alpha – Α α
 Beta – Β β

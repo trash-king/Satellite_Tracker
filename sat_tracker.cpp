@@ -1,5 +1,6 @@
+#include <curl/curl.h>
+#include <vector>
 #include "sat_tracker.h"
-
 
 SatTracker::SatTracker()
 {
@@ -41,9 +42,16 @@ json SatTracker::getDataFromURL()
 void SatTracker::getSatelliteData(char * satellite_id)
 {
     json outputData = getDataFromURL();
-    char res;
-    std::cout << "Save to Local Dictionary? Y/N"<< std::endl;
-    cin >> res;
-    if(res == "Y") SatelliteDictionary.appendToUserDict(outputData);
+    vector<json> all_items;
+    for(auto & [key, value] : outputData.items())
+    {
+        all_items.push_back(value);
+    }
+    for(int i = 0; i < all_items.size() - 1; i++)
+    {
+        std::cout << all_items[i] << std::endl;
+    }
+    
+
 
 }
