@@ -1,6 +1,7 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
+#include <vector>
 #include "vector3.h"
 #include "orbital_math.h"
 #include "date/date.h"
@@ -194,11 +195,9 @@ vector3 generate_ECI_vector(vector3 ecef_vector, double timestamp)              
     return eci_vector;   
 }
 
-vector3 generate_ECEF_at_position(vector3 snapshot1, vector3 snapshot2, double t1, double t2)
+vector3 get_ECI_velocity(vector3 snapshot1, vector3 snapshot2, double t1, double t2)
 {
-    //snapshot 1 is lat/long/alt t1 - timestamp 1
-    //snapshot 2 is lat/long/alt t2 - timestamp 2
-    //t1 and t2 are the timestamps themselves
+
     vector3 s1 = generate_ECEF_vector(snapshot1.x, snapshot1.y, snapshot1.z);
     vector3 s2 = generate_ECEF_vector(snapshot2.x, snapshot2.y, snapshot2.z);
 
@@ -208,6 +207,39 @@ vector3 generate_ECEF_at_position(vector3 snapshot1, vector3 snapshot2, double t
     return scalar_division((s2 - s1), (t2 - t1));
 }
 
+vector3 compute_acceleration(vector3 rECI)
+{
+    double mag = magnitude(rECI);
+    double factor = -mu / (mag * mag * mag);
+    return vector3{factor * rECI.x, factor * rECI.y,factor * rECI.z};
+}
+
+vector6 derivative_of_position(vector6 state)
+{
+    return vector6{state.v, compute_acceleration(state.p)};
+}
+
+vector6 runge_kutta(vector6 d, double h)
+{
+    vector6 k1 = derivative_of_position(d);
+    vector6 k2 = derivative_of_position(d + k1 * (h/2.0));
+    vector6 k3 = derivative_of_position(d + k2 * (h/2.0));
+    vector6 k4 = derivative_of_position(d + k3 * h);
+
+    return (d + (h/6)) * (k1 + (k2 * 2.0) + (k3 * 2.0) + k4);
+}
+
+void calculate_trajectory(vector6 vec)
+{
+    std::vector<vector6> current_trajectory;
+    current_trajectory.push_back(vec);
+
+    for(int i = 0; i < 60; i += step)
+    {
+        current_trajectory.push_back(runge_kutta(vec, step));
+    }
+
+}
 
 //rECI is the result of generate_ECI_vector
 

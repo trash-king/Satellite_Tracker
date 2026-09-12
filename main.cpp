@@ -1,29 +1,49 @@
 #include <iostream>
-#include <string>
-#include "nlohmann/json.hpp"
-//#include "cpr/cpr.h"
-#include "sat_tracker.h"
-
-using namespace nlohmann;
-
-SatelliteDictionary sat_dict    = SatelliteDictionary();
-SatTracker          sat_track   = SatTracker();
+#include "satellite_dict.h"
+#include "orbital_math.h"
 
 
 bool is_running  = true;
+//SatelliteDictionary * d_tron = new SatelliteDictionary(1); 
+
+class SatTracker
+{
+    public:
+    SatTracker();
+    void selectSatellite();
+    void displayLaunchData();
+    void displayEpochData();
+    void displayOrbitalData();
+
+    //"https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s" % (tracked_satellite.satellite_id, tracked_satellite.satellite_api_key)
+    protected:
+    char * getLaunchData();      //returns a data object instead of displaying data     
+    char * getEpochData();
+    char * getOrbitalData();
+    static size_t write_callback(char * ptr, size_t size, size_t new_member, void* user_data);
+    
+    const double gec = 1.082626 * std::pow(10, -3); //geopotential coefficient
+    const double eqr = 6378.137;                    //Earth's equatorial radius
+    private:
+    const char * api_key = "6M9QZG-6FVM3G-L9BFLH-5TYH";
+    void propagateOrbit();
+
+};
+
+SatTracker::SatTracker()
+{
+    std::cout << "SatTracker constructor called" << std::endl;
+}
+
+void SatTracker::selectSatellite()
+{
+    std::cout << "selectSatellite() called" << std::endl;
+}
+
+SatTracker * s_tron          = new SatTracker();
 
 int main()
 {
-    SatTracker().getSatelliteData();
-#if 0
-    //curl_global_init(CURL_GLOBAL_DEFAULT);
-    while(is_running)
-    {
 
-
-    }
-    //curl_global_cleanup();
-    return 0;
-#endif
     return 0;
 }

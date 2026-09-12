@@ -1,11 +1,14 @@
 #include <iostream>
 #include <ostream>
 #include <istream>
-#include "satellite_dict.h"
-#include "nlohmann.h"
 
-SatelliteDictionary::SatelliteDictionary()
+#include <curl/curl.h>
+#include "satellite_dict.h"
+
+SatelliteDictionary::SatelliteDictionary(int ins)
 {
+    this->instance = ins;
+    std::cout << "constructor called" << std::endl;
     generateSatCat();
 }
 
@@ -27,6 +30,48 @@ void SatelliteDictionary::readEntry(int entry)
     } 
         std::cout << "ERROR" << std::endl;
     return;  
+}
+
+static size_t SatelliteDictionary::write_callback(char * ptr, size_t size, size_t new_member, void* user_data)
+{
+    auto output = static_cast<std::string*>(user_data);
+    output->append(ptr, size * new_member);
+    return size  * new_member;
+}
+
+json SatelliteDictionary::getDataFromURL()
+{
+    CURL* curl = curl_easy_init();
+    std::string body;
+    long status_code = 0;
+   // return "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s" % (satellite_id, api_key);
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status_code);
+    curl_easy_cleanup(curl);
+
+    if(res != CURLE_OK || status_code != 200) return "";
+    return json::parse(body);
+}
+
+void SatelliteDictionary::getSatelliteData(std::string satellite_id)
+{
+    json outputData = getDataFromURL();
+    vector<json> all_items;
+    for(auto & [key, value] : outputData.items())
+    {
+        all_items.push_back(value);
+    }
+    for(int i = 0; i < all_items.size() - 1; i++)
+    {
+        std::cout << all_items[i] << std::endl;
+    }
+    
 }
 
 Entry SatelliteDictionary::accessEntry(int entry)
@@ -62,5 +107,5 @@ void SatelliteDictionary::appendToUserDict(json * entry)
 void SatelliteDictionary::generateSatCat()
 {
     std::ifstream f("satcat.json");
-
+    
 }
