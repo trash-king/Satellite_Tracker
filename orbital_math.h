@@ -36,6 +36,6 @@ vector3 generate_ECI_vector(vector3 ecef_vector);
 vector3 generate_ECI_vector(vector3 ecef_vector, double timestamp);
 vector3 get_ECI_velocity(vector3 snapshot1, vector3 snapshot2, double t1, double t2);
 vector3 compute_acceleration(vector3 rECI);
-vector6 derivative_of_position(vector6 state);
+vector6 derivative(vector6 state);
 vector6 runge_kutta(vector6 d, double h);
 void calculate_trajectory(vector6 vec);

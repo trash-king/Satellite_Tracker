@@ -8,123 +8,6 @@
 
 using namespace std::chrono;
 
-/*
-
-For a satellite (negligible mass) orbiting Earth (treated as a point mass), in an Earth-Centered Inertial frame:
-
-𝑟
-⃗
-¨
-=
-−
-𝜇
-𝑟
-3
-𝑟
-⃗
-r
-¨
-=−
-r
-3
-μ
-	​
-
-r
-
-r = (x,y,z) - position relative to Earth's center
-r = |r| - absolute value of r
-μ = standard gravitational parameter (3.968 x 10^14)
-
-v subscript x = sgp * x /r cubed
-v subscript x = sgp * x /r cubed
-
-mu is the standard gravitational parameter of Earth
-
-x˙=vx​,y˙​=vy​,z˙=vz
-derivative of x of t (time) = vx
-derivative of y of t (time) = vy
-derivateive of z of t (time) = vz
-
-(\(\dot{v}_x, \dot{v}_y, \dot{v}_z\)) it's velocity vector over time
-
-Core Equation-
-the second derivative of r(t) (position relative to Earth's center over time)
-is equivalent to
-(standard gravitation parameter / (x,y,z)^3) multiplied by (x,y,z)
-
-to find r, use the 3D pythagorean theorem sqrt(x^2 + y^2 + z^2)
-(x, y, z) is the satellite's 3D position relative to the center of Earth
-if Earth's center is 0,0,0, the satellite is at x, y, z
-
-How far is the satellite from Earth?
-N(o) = a / sqrt(1 - e^2 sin^2 o)
-function of N to latitude
-
-convert latitude to radians.
-sin of (o)
-square sin of (o)
-
-X = (N+h)cos o cos lambda
-Y = (N+h)cos o sin lambda
-Z = (N(1-e^2)+h)sin o
-
-a=
-e^2 = World Geodetic System 1984 = 0.00669438
-o = latitude
-lambda = longitude
-h = altitude
-
-x = X cos 
-
-*/
-
-/*
-NORAD ID:    
-25544
-LOCAL TIME:    
-18:28:11
-UTC:    
-22:28:11
-LATITUDE:    
--50.06
-LONGITUDE:    
--119.86
-ALTITUDE [km]:    
-440.19
-ALTITUDE [mi]:    
-273.52
-SPEED [km/s]:    
-7.65
-SPEED [mi/s]:    
-4.75
-AZIMUTH:    178.0 S  178 degrees based on true north
-ELEVATION:    
--46.1
-RIGHT ASCENSION:    
-20h 21m 35s
-DECLINATION:    
--89° 36' 49''
-
-where 
-𝑎
-a=6378.137 km, 
-𝑒
-2
-e
-2
-≈0.00669438 (WGS84), 
-𝜙
-ϕ=latitude, 
-𝜆
-λ=longitude, 
-ℎ
-h=altitude.
-
-*/
-
-//float r = vector3(1,2,3);
-
 //GMST - Greenwich Mean Sidereal Time
 //j2000 can be delineated by either seconds or days since January 1st, 2000.
 
@@ -214,19 +97,21 @@ vector3 compute_acceleration(vector3 rECI)
     return vector3{factor * rECI.x, factor * rECI.y,factor * rECI.z};
 }
 
-vector6 derivative_of_position(vector6 state)
+
+//returns the rate of change at position 
+vector6 derivative(vector6 state)
 {
     return vector6{state.v, compute_acceleration(state.p)};
 }
 
-vector6 runge_kutta(vector6 d, double h)
+vector6 runge_kutta(vector6 d, double step)
 {
-    vector6 k1 = derivative_of_position(d);
-    vector6 k2 = derivative_of_position(d + k1 * (h/2.0));
-    vector6 k3 = derivative_of_position(d + k2 * (h/2.0));
-    vector6 k4 = derivative_of_position(d + k3 * h);
+    vector6 k1 = derivative(d);
+    vector6 k2 = derivative(d + k1 * (step/2.0));
+    vector6 k3 = derivative(d + k2 * (step/2.0));
+    vector6 k4 = derivative(d + k3 * step);
 
-    return (d + (h/6)) * (k1 + (k2 * 2.0) + (k3 * 2.0) + k4);
+    return d + (k1 + k2*2.0 + k3*2.0 + k4) * (step/6.0);
 }
 
 void calculate_trajectory(vector6 vec)
@@ -240,63 +125,3 @@ void calculate_trajectory(vector6 vec)
     }
 
 }
-
-//rECI is the result of generate_ECI_vector
-
-/*
-how to calculate rECEF: rECEF is the velocity vector of Earth-Centered Earth-Fixed
-rotation. This is the velocity of the rotation of ECEF. Earth-Centered Earth Fixed vector rotates at a velocity ofX
-
-vECEF = r*ECEF(t2) - r*ECEF(t1)/t2- t1
-What this means is to take the rotational vector of ECEF at two specific points in time, then find the
-rate between the two points.
-Or we can pull it from Celestrack or some other source. THis is the ECEF of Earth, it doesn't change
-
-*/
-
-//ECI is non-rotating, but ECEF rotates with Earth
-//ECI is fixed, while ECEF is not fixed
-
-//vECI - ECI velocity vector. This is a velocity vector relative to Earth's rotation rate
-//vECI = R(θ) (R theta is A rotation matrix, vector R rotated by angle theta. Theta refers to Greenwich Mean Sidereal Time)
-//R(theta) = generate_ECI_vector
-
-//vECI (velocity vector) = generate_ECI_vector * vECEF + Earth's rotation rate * rECI
-
-
-/*
-X = (N+h)cos o cos lambda
-Y = (N+h)cos o sin lambda
-Z = (N(1-e^2)+h)sin o
-
-ωE ≈7.292115×10^-5 rad/s, Earth's rotation rate. Earth rotates at a rate of 7.292115x10^-5 radians per second
-This is measured relative to the stars (sidereal) as opposed to the sun.
-E
-	​
-
-Alpha – Α α
-Beta – Β β
-Gamma – Γ γ
-Delta – Δ δ
-Epsilon – Ε ε
-Zeta – Ζ ζ
-Eta – Η η
-Theta – Θ θ
-Iota – Ι ι
-Kappa – Κ κ
-Lambda – Λ λ
-Mu – Μ μ
-Nu – Ν ν
-Xi – Ξ ξ
-Omicron – Ο ο
-Pi – Π π
-Rho – Ρ ρ
-Sigma – Σ σ 
-ς (final sigma)
-Tau – Τ τ
-Upsilon – Υ υ
-Phi – Φ φ
-Chi – Χ χ
-Psi – Ψ ψ
-Omega – Ω ω
-*/
