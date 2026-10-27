@@ -1,11 +1,19 @@
 #include <iostream>
 #include <ostream>
 #include <istream>
+#include <unordered_map>
 
 #include "orbital_math.h"
 #include "nlohmann/json.hpp"
 
 #include <curl/curl.h>
+
+
+/*
+
+
+
+*/
 
 
 using namespace nlohmann;
@@ -40,6 +48,36 @@ struct Entry
 
 };
 
+std::unordered_map<int, Entry>satellite_dictionary = {};
+
+void to_json(json& j, const Entry& p)
+{
+    j =json{{"satellite_id", p.satellite_id}, {"satellite_name", p.satellite_name}, {"launch_number", p.launch_number}, {"launch_year", p.launch_year}, {"launch_piece", p.launch_piece}, {"epoch_day", p.epoch_day}, {"epoch_year", p.epoch_year}
+    , {"launch_piece", p.launch_piece}, {"epoch_day", p.epoch_day}, {"epoch_year", p.epoch_year}, {"ballistic_coefficient", p.ballistic_coefficient}, {"radiation_drag", p.radiation_drag}, {"latitude", p.latitude}, {"azimuth", p.azimuth}
+    , {"elevation", p.elevation}, {"ra", p.ra}, {"declination", p.declination}, {"timestamp", p.timestamp}};
+}
+
+void from_json(json& j, const Entry& p)
+{
+    j.at("satellite_name").get_to(p.satellite_name);
+    j.at("launch_number").get_to(p.launch_number);
+    j.at("launch_year").get_to(p.launch_year);
+    j.at("launch_piece").get_to(p.launch_piece);
+    j.at("epoch_day").get_to(p.epoch_day);
+    j.at("epoch_year").get_to(p.epoch_year);
+    j.at("ballistic_coefficient").get_to(p.ballistic_coefficient);
+    j.at("radiation_drag").get_to(p.radiation_drag);
+    j.at("satellite_id").get_to(p.satellite_id);
+    j.at("latitude").get_to(p.latitude);
+    j.at("longitude").get_to(p.longitude);
+    j.at("azimuth").get_to(p.azimuth);
+    j.at("elevation").get_to(p.elevation);
+    j.at("ra").get_to(p.ra);
+    j.at("declination").get_to(p.declination);
+    j.at("timestamp").get_to(p.timestamp);
+
+}
+
 class SatelliteDictionary
 {
     public:
@@ -48,7 +86,6 @@ class SatelliteDictionary
     Entry accessEntry(int entry);                         //accesses an object from the dictionary
     size_t write_callback(char * ptr, size_t size, size_t new_member, void* user_data);
     json getDataFromURL();
-    void appendToUserDict(json * entry);
     protected:
     int instance;
     std::vector<Entry> user_satcat;
@@ -92,14 +129,15 @@ size_t SatelliteDictionary::write_callback(char * ptr, size_t size, size_t new_m
     return size  * new_member;
 }
 
-json SatelliteDictionary::getDataFromURL()
+json SatelliteDictionary::getDataFromURL(std::string satellite_id, std::string api_key)
 {
     CURL* curl = curl_easy_init();
     std::string body;
     long status_code = 0;
    // return "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s" % (satellite_id, api_key);
+    std::string s_url = "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s",satellite_id,api_key
 
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_URL, s_url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
@@ -110,10 +148,11 @@ json SatelliteDictionary::getDataFromURL()
 
     if(res != CURLE_OK || status_code != 200) return "";
     return json::parse(body);
+    //returns a parsed JSON object - we then extract the values from n2yo's json value
 }
 
 Entry SatelliteDictionary::accessEntry(int entry)
-{
+{++
     //we can use binary search as the SATIDs are sorted
     int pivot = 0;
     int left = 0;
@@ -126,20 +165,6 @@ Entry SatelliteDictionary::accessEntry(int entry)
         else left = pivot + 1;
     } 
     return user_satcat[left];
-}
-
-void SatelliteDictionary::appendToUserDict(json * entry)
-{
-
-    entry["satid"] =        user_satcat[0].satellite_id;
-    entry["satname"] =      user_satcat[0].satellite_name;
-    entry["satlatitude"] =  user_satcat[0].latitude;
-    entry["satlongitude"] = user_satcat[0].longitude;
-    entry["azimuth"] =      user_satcat[0].azimuth;
-    entry["elevation"] =    user_satcat[0].elevation;
-    entry["ra"] =           user_satcat[0].ra;
-    entry["dec"] =          user_satcat[0].declination;
-    entry["timestamp"] =    user_satcat[0].timestamp;
 }
 
 void SatelliteDictionary::generateSatCat()
