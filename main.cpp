@@ -9,12 +9,6 @@
 #include <curl/curl.h>
 
 
-/*
-
-
-
-*/
-
 
 using namespace nlohmann;
 
@@ -129,10 +123,11 @@ size_t SatelliteDictionary::write_callback(char * ptr, size_t size, size_t new_m
     return size  * new_member;
 }
 
-json SatelliteDictionary::getDataFromURL(std::string satellite_id, std::string api_key)
+json SatelliteDictionary::getDataFromURL(std::string satellite_id)
 {
     CURL* curl = curl_easy_init();
     std::string body;
+    std::string api_key = "6M9QZG-6FVM3G-L9BFLH-5TYH";
     long status_code = 0;
    // return "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s" % (satellite_id, api_key);
     std::string s_url = "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s",satellite_id,api_key

@@ -1,7 +1,6 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
-#include <vector>
 #include "vector3.h"
 #include "orbital_math.h"
 #include "date/date.h"
@@ -11,19 +10,19 @@ using namespace std::chrono;
 //GMST - Greenwich Mean Sidereal Time
 //j2000 can be delineated by either seconds or days since January 1st, 2000.
 
-double time_since_j2000()
+double time_since_j2000(double unix_seconds)
 {
-    auto j2000 = date::sys_days{date::year{2000}/1/1};
+    auto j2000 = date::sys_days{date::year{2000}/1/1} + std::chrono::hours{12};
     auto cur = std::chrono::system_clock::now();
 
-    auto duration = std::chrono::duration_cast<std::chrono::duration<double, date::days::period>>(cur-j2000);
-    return duration.count();
+    double j2000_unix = std::chrono::duration_cast<std::chrono::seconds>(j2000.time_since_epoch()).count();
+    return (unix_seconds - j2000_unix) / 86400;
 }
 
-double gmst() //j2000 - Reference epoch is January 1st, 2000. J2000 is time since this reference point  //jd Julian Date - number of solar days since J2000 
+double gmst(double unix_seconds) //j2000 - Reference epoch is January 1st, 2000. J2000 is time since this reference point  //jd Julian Date - number of solar days since J2000 
 {
     //280.46061837
-   double ref_epoch = time_since_j2000();
+   double ref_epoch = time_since_j2000(unix_seconds);
    return std::fmod(gmst_j2000 + SOLAR_DAY * (ref_epoch), 360.0); //
 }
 
@@ -54,12 +53,25 @@ vector3 generate_ECEF_vector(double longitude, double latitude, double altitude)
     return ecef_vec;
 }
 
+/*
+ECI vector
+Z-axis points to the North Pole
+X-axis points towards the vernal equinox
+Y-axis completes a right-handed system in the equitorial plane (is always 90 degrees perpendicular to the X value)
 
+ECEF vector
+Z-axis points to the North Pole
+X-axis always points to the equator but moves with the Earth
+Y-axis completes a right-handed system (is always 90 degrees perpendicular to the X value)
 
-vector3 generate_ECI_vector(vector3 ecef_vector)                                //earth-centered initial
+Shorthand- if the X and Y equations were plotted, Y would always be exactly 90 degrees to X
+
+*/
+
+vector3 generate_ECI_vector(vector3 ecef_vector, double unix_timestamp)                        //earth-centered initial (takes a time value)
 {
     vector3 eci_vector;
-    double g_time = gmst() * (M_PI/180);
+    double g_time = gmst(unix_timestamp) * (M_PI/180);
     eci_vector.x = (ecef_vector.x * cos(g_time) - ecef_vector.y * sin(g_time)); //X
     eci_vector.y = (ecef_vector.x * sin(g_time) + ecef_vector.y * cos(g_time)); //Y
     eci_vector.z = (ecef_vector.z);                                             //Z
@@ -67,10 +79,10 @@ vector3 generate_ECI_vector(vector3 ecef_vector)                                
     return eci_vector;
 }
 
-vector3 generate_ECI_vector(vector3 ecef_vector, double timestamp)              //earth-centered initial at specified timestamp
+vector3 generate_ECI_vector_at_point(vector3 ecef_vector, double gmst_degrees)              //earth-centered initial at specified timestamp (takes the angle between two X axes)
 {
     vector3 eci_vector;
-    double g_time = timestamp * (M_PI/180);
+    double g_time = gmst_degrees * (M_PI/180);
     eci_vector.x = (ecef_vector.x * cos(g_time) - ecef_vector.y * sin(g_time)); //X
     eci_vector.y = (ecef_vector.x * sin(g_time) + ecef_vector.y * cos(g_time)); //Y
     eci_vector.z = (ecef_vector.z);                                             //Z
@@ -78,22 +90,26 @@ vector3 generate_ECI_vector(vector3 ecef_vector, double timestamp)              
     return eci_vector;   
 }
 
-vector3 get_ECI_velocity(vector3 snapshot1, vector3 snapshot2, double t1, double t2)
+vector3 get_ECI_velocity(vector3 snapshot1, vector3 snapshot2, double v1, double v2)
 {
+    double t1 = gmst(v1);
+    double t2 = gmst(v2);
 
     vector3 s1 = generate_ECEF_vector(snapshot1.x, snapshot1.y, snapshot1.z);
     vector3 s2 = generate_ECEF_vector(snapshot2.x, snapshot2.y, snapshot2.z);
 
-    s1 = generate_ECI_vector(s1, t1);
-    s2 = generate_ECI_vector(s2, t2);
+    s1 = generate_ECI_vector_at_point(s1, t1);
+    s2 = generate_ECI_vector_at_point(s2, t2);
 
-    return scalar_division((s2 - s1), (t2 - t1));
+    return scalar_division((s2 - s1), (v2 - v1));
 }
 
 vector3 compute_acceleration(vector3 rECI)
 {
     double mag = magnitude(rECI);
     double factor = -mu / (mag * mag * mag);
+
+
     return vector3{factor * rECI.x, factor * rECI.y,factor * rECI.z};
 }
 
@@ -114,14 +130,21 @@ vector6 runge_kutta(vector6 d, double step)
     return d + (k1 + k2*2.0 + k3*2.0 + k4) * (step/6.0);
 }
 
-void calculate_trajectory(vector6 vec)
+std::vector<vector6> calculate_trajectory(vector6 vec, double duration)
 {
     std::vector<vector6> current_trajectory;
-    current_trajectory.push_back(vec);
+    vector6 state = vec;
+    current_trajectory.push_back(state);
 
-    for(int i = 0; i < 60; i += step)
+    int steps = static_cast<int>(duration/step);
+
+    for(int i = 0; i < steps; ++i)
     {
-        current_trajectory.push_back(runge_kutta(vec, step));
+        state = runge_kutta(state, step);
+        current_trajectory.push_back(state);
+        
     }
+
+    return current_trajectory;
 
 }

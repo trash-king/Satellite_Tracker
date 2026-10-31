@@ -1,4 +1,6 @@
+#pragma once
 #include "vector3.h"
+#include <vector>
 
 struct vector6 
 {
@@ -7,6 +9,7 @@ struct vector6
 
     vector6() : p(0,0,0), v(0,0,0) {};
     vector6(double px_, double py_, double pz_, double vx_, double vy_, double vz_) : p(px_,py_,pz_), v(vx_, vy_,vz_) {};
+    vector6(vector3 vec_x, vector3 vec_y) : p(vec_x.x,vec_x.y,vec_x.z), v(vec_y.x,vec_y.y,vec_y.z) {};
 
 
     vector6 operator+(vector6 vec) const {return vector6(p.x + vec.p.x, p.y + vec.p.y, p.z + vec.p.z, v.x + vec.v.x, v.y + vec.v.y, v.z + vec.v.z);}
@@ -28,14 +31,14 @@ const double step           = 15.0;         //step size for Runge-Kutta equation
 
 //e2≈0.00669438
 
-double time_since_j2000();
-double gmst();
+double time_since_j2000(double unix_seconds);
+double gmst(double unix_seconds);
 double radius_of_curvature(double latitude);
 vector3 generate_ECEF_vector(double longitude, double latitude, double altitude);
-vector3 generate_ECI_vector(vector3 ecef_vector);
-vector3 generate_ECI_vector(vector3 ecef_vector, double timestamp);
+vector3 generate_ECI_vector(vector3 ecef_vector, double unix_timestamp);
+vector3 generate_ECI_vector_at_point(vector3 ecef_vector, double gmst_degrees);
 vector3 get_ECI_velocity(vector3 snapshot1, vector3 snapshot2, double t1, double t2);
 vector3 compute_acceleration(vector3 rECI);
 vector6 derivative(vector6 state);
 vector6 runge_kutta(vector6 d, double h);
-void calculate_trajectory(vector6 vec);
+std::vector<vector6> calculate_trajectory(vector6 vec, double duration);
