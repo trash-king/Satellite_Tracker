@@ -72,12 +72,6 @@ void from_json(json& j, Entry& p)
 
 }
 
-size_t write_cb(char *ptr, size_t size, size_t nmemb, void *userdata) {
-    size_t total_size = size * nmemb;
-    // Append or process 'ptr' using 'userdata'
-    return total_size;
-}
-
 class SatelliteDictionary
 {
     public:
@@ -122,11 +116,13 @@ void SatelliteDictionary::readEntry(int entry)
     return;  
 }
 
-size_t SatelliteDictionary::write_callback(char * ptr, size_t size, size_t new_member, void* user_data)
+
+size_t write_cb(char *ptr, size_t size, size_t nmemb, void *userdata) 
 {
-    auto output = static_cast<std::string*>(user_data);
-    output->append(ptr, size * new_member);
-    return size  * new_member;
+    size_t total_size = size * nmemb;
+    static_cast<std::string*>(userdata)->append(ptr, total_size);
+    
+    return total_size;
 }
 
 json SatelliteDictionary::getDataFromURL(std::string sid)
@@ -136,7 +132,7 @@ json SatelliteDictionary::getDataFromURL(std::string sid)
     std::string api_key = "6M9QZG-6FVM3G-L9BFLH-5TYH";
     long status_code = 0;
    // return "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s" % (satellite_id, api_key);
-    std::string s_url = "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s",sid,api_key
+    std::string s_url = "https://api.n2yo.com/rest/v1/satellite/tle/" + sid + "&apiKey=" + api_key;
 
     curl_easy_setopt(curl, CURLOPT_URL, s_url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
