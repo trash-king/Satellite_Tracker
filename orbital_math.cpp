@@ -3,6 +3,7 @@
 #include <chrono>
 #include "vector3.h"
 #include "orbital_math.h"
+#define ONLY_C_LOCALE   1       //fixes a bug in the date/date.h library      
 #include "date/date.h"
 
 using namespace std::chrono;
@@ -102,6 +103,28 @@ vector3 get_ECI_velocity(vector3 snapshot1, vector3 snapshot2, double v1, double
     s2 = generate_ECI_vector_at_point(s2, t2);
 
     return scalar_division((s2 - s1), (v2 - v1));
+}
+//True Equator, Mean Equinox
+vector3 teme_to_ecef(vector3 teme_vector, double unix_timestamp)
+{
+    vector3 ecef_vector;
+    double g_time = gmst(unix_timestamp) * (M_PI/180);
+    ecef_vector.x = ((teme_vector.x * cos(g_time)) + (teme_vector.y * sin(g_time)));
+    ecef_vector.y = ((-1 * (teme_vector.x * sin(g_time))) + (teme_vector.y * cos(g_time)) );
+    ecef_vector.z = teme_vector.z;
+
+    return ecef_vector;
+}
+
+vector3 teme_to_ecef_at_point(vector3 teme_vector, double gmst_degrees)
+{
+    vector3 ecef_vector;
+    double g_time = gmst_degrees * (M_PI/180);
+    ecef_vector.x = teme_vector.x * cos(g_time) + teme_vector.y * sin(g_time); //X
+    ecef_vector.y = -teme_vector.x * sin(g_time) + teme_vector.y * cos(g_time); //Y
+    ecef_vector.z = (teme_vector.z);                                             //Z
+
+    return ecef_vector;  
 }
 
 vector3 compute_acceleration(vector3 rECI)

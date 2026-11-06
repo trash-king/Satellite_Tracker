@@ -37,6 +37,7 @@ double radius_of_curvature(double latitude);
 vector3 generate_ECEF_vector(double longitude, double latitude, double altitude);
 vector3 generate_ECI_vector(vector3 ecef_vector, double unix_timestamp);
 vector3 generate_ECI_vector_at_point(vector3 ecef_vector, double gmst_degrees);
+vector3 teme_to_ecef(vector3 ecef_vector, double unix_timestamp);
 vector3 get_ECI_velocity(vector3 snapshot1, vector3 snapshot2, double t1, double t2);
 vector3 compute_acceleration(vector3 rECI);
 vector6 derivative(vector6 state);
