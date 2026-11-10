@@ -99,9 +99,79 @@ struct TLE_Element
     B_drag and eccentricity - 
 
 */
-                                                    
+   
+/*
+
+Our procedure -
+1: Make call to N2Yo
+2: populate Entry with our recieved JSON object
+3: populate TLE_Element of Entry with nav data
+4: Update with new nav data information
+
+*/
+
+//delegate connectivity to a separate manager, not the dictionary
+
+class RequestManager
+{
+    public: 
+    RequestManager();
+    size_t write_callback(char * ptr, size_t size, size_t new_member, void* user_data);
+    json get_sat_request(){return (*curl_return);}
+    protected:
+    void getDataFromURL(std::string sid);
+    private:
+    std::string api_key = "6M9QZG-6FVM3G-L9BFLH-5TYH";
+    json * curl_return;
+}
+
+RequestManager::RequestManager()
+{
+
+}
+
+size_t RequestManager::write_cb(char *ptr, size_t size, size_t nmemb, void *userdata) 
+{
+    size_t total_size = size * nmemb;
+    static_cast<std::string*>(userdata)->append(ptr, total_size);
+    
+    return total_size;
+}
+
+json RequestManager::getDataFromURL(std::string sid)
+{
+    CURL* curl = curl_easy_init();
+    std::string body = "";
+   
+    long status_code = 0;
+   // return "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s" % (satellite_id, api_key);
+    std::string s_url = "https://api.n2yo.com/rest/v1/satellite/tle/" + sid + "&apiKey=" + api_key;
+
+    curl_easy_setopt(curl, CURLOPT_URL, s_url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status_code);
+    curl_easy_cleanup(curl);
+
+    if(res != CURLE_OK || status_code != 200)
+    {
+        curl_easy_strerror(res);
+        return "";
+    }
+    &curl_return = json::parse(body); 
+    //return json::parse(body);
+
+    //returns a parsed JSON object - we then extract the values from n2yo's json value
+}
+
+std::unordered_map<int, Entry>satellite_dictionary = {};
+
 struct Entry
 {
+    public:
     int  entry_id;
     std::string satellite_name;
     int satellite_id;
@@ -122,26 +192,47 @@ struct Entry
     std::string timestamp;
 
     TLE_Element tle;
-    std::string t_string;
-
+    std::string t_string; //we extract T-String from the tle element string.
+    //THere's a better way of doing this but I'm doing this for now
+/*
     Entry(int id, std::string s_n, int s_i, std::string ln, std::string ly, std::string lp,
           std::string ed, std::string ey, std::string bc, std::string rd, std::string lat, std::string log, std::string az, std::string el, std::string r, std::string dec, std::string tims, TLE_Element t) :
           entry_id(id), satellite_name(s_n), satellite_id(s_i), launch_number(ln),
           launch_year(ly), launch_piece(lp), epoch_day(ed), epoch_year(ey), ballistic_coefficient(bc),
           radiation_drag(rd), latitude(lat), longitude(log), azimuth(az), elevation(el), ra(r), declination(dec), timestamp(tims), tle(t) {};
+*/
+    Entry(json j);
+    void populate_entry(std::string s);
+    void extract_t_string();
+
 
 };
 
-std::unordered_map<int, Entry>satellite_dictionary = {};
-
-void to_json(json& j, Entry& p)
+Entry::Entry(json j)
 {
-    j =json{{"satellite_id", p.satellite_id}, {"satellite_name", p.satellite_name}, {"launch_number", p.launch_number}, {"launch_year", p.launch_year}, {"launch_piece", p.launch_piece}, {"epoch_day", p.epoch_day}, {"epoch_year", p.epoch_year}
-    , {"launch_piece", p.launch_piece}, {"epoch_day", p.epoch_day}, {"epoch_year", p.epoch_year}, {"ballistic_coefficient", p.ballistic_coefficient}, {"radiation_drag", p.radiation_drag}, {"latitude", p.latitude}, {"azimuth", p.azimuth}
-    , {"elevation", p.elevation}, {"ra", p.ra}, {"declination", p.declination}, {"timestamp", p.timestamp}};
+    
 }
 
-void from_json(const json& j, Entry& p)
+void Entry::to_json() const {
+    return json{
+        {"satellite_id", satellite_id},
+        {"satellite_name", satellite_name},
+        {"launch_number", launch_number},
+        {"launch_year", launch_year},
+        {"launch_piece", launch_piece},
+        {"epoch_day", epoch_day},
+        {"ballistic_coefficient", ballistic_coefficient},
+        {"radiation_drag", radiation_drag},
+        {"latitude", latitude},
+        {"azimuth", azimuth},
+        {"elevation", elevation},
+        {"ra", ra},
+        {"declination", declination},
+        {"timestamp", timestamp}
+    }
+}
+
+void Entry::from_json(const json& j, Entry& p)
 {
     
     if(j.contains("error"))
@@ -158,14 +249,38 @@ void from_json(const json& j, Entry& p)
     }
 }
 
+void Entry::extract_t_string()
+{
+
+}
+
+void Entry::populate_entry()
+{
+    std::string s = this->t_string;
+
+    this->launch_year = s.substr(9,2);
+    this->launch_number = s.substr(11,3);
+    this->launch_piece = s.substr(14,3);
+
+    this->epoch_year = s.substr(19,1);
+    this->epoch_day  = s.substr(21,11);
+
+    this->ballistic_coefficient = s.substr(33,10);
+    this->radiation_drag        = s.substr(53,8);
+    /*
+          self.ballistic_coefficient = launchData[33:43]
+        self.radiation_drag = launchData[53:61]
+    */
+}
+
 class SatelliteDictionary
 {
     public:
     SatelliteDictionary(int ins);
     void readEntry(int entry);                                    //reads an entry from the dictionary
     Entry accessEntry(int entry);                         //accesses an object from the dictionary
-    size_t write_callback(char * ptr, size_t size, size_t new_member, void* user_data);
-    json getDataFromURL(std::string sid);
+    bool createEntry(std::string id);                    //creates a new entry entirely
+
     void propogate_tle(TLE_Element tle);    //makes the calls to orbital_math
     void displayJSON(json j);
     protected:
@@ -198,6 +313,28 @@ void SatelliteDictionary::propogate_tle(TLE_Element tle)
    std::cout << "null" << std::endl;
 }
 
+void SatelliteDictionary::createEntry(std::string id)
+{
+    Entry new_entry(getDataFromURL(id));
+    int cur_id = satellite_dictionary.size() + 1;
+
+    auto [iterator, success] = satellite_dictionary.emplace(cur_id, new_entry);
+    if(!success)
+    {
+        printf("Failure to add Entry %s at position %d\n",id, cur_id);
+        return false;
+    }else
+    {
+        printf("New Entry %s added at position %d\n",id, cur_id);
+        readEntry(cur_id);
+        return true;
+    }
+
+    printf("New Entry %s failed for unknown reason.\n",id);
+    return false;
+    
+}
+
 void SatelliteDictionary::readEntry(int entry)
 {
     //we can use binary search as the SATIDs are sorted
@@ -214,46 +351,8 @@ void SatelliteDictionary::readEntry(int entry)
         else if(user_satcat[pivot].satellite_id > entry) right = pivot - 1;
         else left = pivot + 1;
     } 
-        std::cout << "ERROR" << std::endl;
+    std::cout << "ERROR" << std::endl;
     return;  
-}
-
-
-size_t write_cb(char *ptr, size_t size, size_t nmemb, void *userdata) 
-{
-    size_t total_size = size * nmemb;
-    static_cast<std::string*>(userdata)->append(ptr, total_size);
-    
-    return total_size;
-}
-
-json SatelliteDictionary::getDataFromURL(std::string sid)
-{
-    CURL* curl = curl_easy_init();
-    std::string body = "";
-    std::string api_key = "6M9QZG-6FVM3G-L9BFLH-5TYH";
-    long status_code = 0;
-   // return "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s" % (satellite_id, api_key);
-    std::string s_url = "https://api.n2yo.com/rest/v1/satellite/tle/" + sid + "&apiKey=" + api_key;
-
-    curl_easy_setopt(curl, CURLOPT_URL, s_url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-    CURLcode res = curl_easy_perform(curl);
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status_code);
-    curl_easy_cleanup(curl);
-
-    if(res != CURLE_OK || status_code != 200) return "";
-
-    std::cout << " --- START BODY --- " << std::endl;
-    std::cout << body << std::endl;
-    std::cout << " --- END BODY --- " << std::endl;
-
-    return json::parse(body);
-
-    //returns a parsed JSON object - we then extract the values from n2yo's json value
 }
 
 Entry SatelliteDictionary::accessEntry(int entry)
