@@ -162,6 +162,7 @@ json RequestManager::getDataFromURL(std::string sid)
         return "";
     }
     &curl_return = json::parse(body); 
+    if(&curl_return->contains("error")) mprintf("Error: %s\n",curl_return->at("error"));
     //return json::parse(body);
 
     //returns a parsed JSON object - we then extract the values from n2yo's json value
