@@ -116,18 +116,19 @@ class RequestManager
 {
     public: 
     RequestManager();
-    size_t write_callback(char * ptr, size_t size, size_t new_member, void* user_data);
+    size_t write_cb(char *ptr, size_t size, size_t nmemb, void *userdata);
     json get_sat_request(){return (*curl_return);}
-    protected:
     void getDataFromURL(std::string sid);
+    protected:
+    
     private:
     std::string api_key = "6M9QZG-6FVM3G-L9BFLH-5TYH";
     json * curl_return;
-}
+};
 
 RequestManager::RequestManager()
 {
-
+    printf("RequestManager Instantiated\n");
 }
 
 size_t RequestManager::write_cb(char *ptr, size_t size, size_t nmemb, void *userdata) 
@@ -138,7 +139,7 @@ size_t RequestManager::write_cb(char *ptr, size_t size, size_t nmemb, void *user
     return total_size;
 }
 
-json RequestManager::getDataFromURL(std::string sid)
+void RequestManager::getDataFromURL(std::string sid)
 {
     CURL* curl = curl_easy_init();
     std::string body = "";
@@ -148,7 +149,7 @@ json RequestManager::getDataFromURL(std::string sid)
     std::string s_url = "https://api.n2yo.com/rest/v1/satellite/tle/" + sid + "&apiKey=" + api_key;
 
     curl_easy_setopt(curl, CURLOPT_URL, s_url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
@@ -159,16 +160,16 @@ json RequestManager::getDataFromURL(std::string sid)
     if(res != CURLE_OK || status_code != 200)
     {
         curl_easy_strerror(res);
-        return "";
     }
-    &curl_return = json::parse(body); 
-    if(&curl_return->contains("error")) mprintf("Error: %s\n",curl_return->at("error"));
+    *curl_return = json::parse(body); 
+    if(curl_return->contains("error")) printf("Error: %s\n",curl_return->at("error"));
     //return json::parse(body);
 
     //returns a parsed JSON object - we then extract the values from n2yo's json value
 }
 
-std::unordered_map<int, Entry>satellite_dictionary = {};
+RequestManager * request_manager = new RequestManager();
+extern RequestManager * request_manager;
 
 struct Entry
 {
@@ -205,16 +206,11 @@ struct Entry
     Entry(json j);
     void populate_entry(std::string s);
     void extract_t_string();
-
-
+    void from_json(const json& j, Entry& p);
+    json to_json() const;
 };
 
-Entry::Entry(json j)
-{
-    
-}
-
-void Entry::to_json() const {
+json Entry::to_json() const {
     return json{
         {"satellite_id", satellite_id},
         {"satellite_name", satellite_name},
@@ -230,7 +226,7 @@ void Entry::to_json() const {
         {"ra", ra},
         {"declination", declination},
         {"timestamp", timestamp}
-    }
+    };
 }
 
 void Entry::from_json(const json& j, Entry& p)
@@ -255,9 +251,9 @@ void Entry::extract_t_string()
 
 }
 
-void Entry::populate_entry()
+void Entry::populate_entry(std::string s)
 {
-    std::string s = this->t_string;
+    s = this->t_string;
 
     this->launch_year = s.substr(9,2);
     this->launch_number = s.substr(11,3);
@@ -274,6 +270,8 @@ void Entry::populate_entry()
     */
 }
 
+std::unordered_map<int, Entry>satellite_dictionary = {};
+
 class SatelliteDictionary
 {
     public:
@@ -281,7 +279,7 @@ class SatelliteDictionary
     void readEntry(int entry);                                    //reads an entry from the dictionary
     Entry accessEntry(int entry);                         //accesses an object from the dictionary
     bool createEntry(std::string id);                    //creates a new entry entirely
-
+    
     void propogate_tle(TLE_Element tle);    //makes the calls to orbital_math
     void displayJSON(json j);
     protected:
@@ -314,9 +312,16 @@ void SatelliteDictionary::propogate_tle(TLE_Element tle)
    std::cout << "null" << std::endl;
 }
 
-void SatelliteDictionary::createEntry(std::string id)
+bool SatelliteDictionary::createEntry(std::string id)
 {
-    Entry new_entry(getDataFromURL(id));
+    if(request_manager == NULL)
+    {
+        printf("Error: Request Manager uninstantiated:\n");
+        return false;
+    }
+    request_manager->getDataFromURL(id);
+    Entry new_entry(request_manager->get_sat_request());
+    
     int cur_id = satellite_dictionary.size() + 1;
 
     auto [iterator, success] = satellite_dictionary.emplace(cur_id, new_entry);
@@ -421,7 +426,7 @@ void SatTracker::selectSatellite()
     std::cout << "selectSatellite() called" << std::endl;
 }
 
-SatTracker * s_tron          = new SatTracker();
+SatTracker * s_tron              = new SatTracker();
 
 int main()
 {
@@ -442,7 +447,7 @@ int main()
         }
         while(input.size() > 5) input.insert(0, 1, '0');
 
-        displayJSON(d_tron->getDataFromURL(input));
+       request_manager->getDataFromURL(input);
     }
     std::cout << "DEBUG TEST END" << std::endl;
 
