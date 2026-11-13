@@ -95,15 +95,16 @@ class RequestManager
 {
     public: 
     RequestManager();
-    size_t write_cb(char *ptr, size_t size, size_t nmemb, void *userdata);
-    json get_sat_request(){return (*curl_return);}
+    static size_t write_cb(char *ptr, size_t size, size_t nmemb, void *userdata);
+    json get_sat_request(){return (this->curl_return);}
     void getDataFromURL(std::string sid);
     bool checksum();
     protected:
     
     private:
     std::string api_key = "6M9QZG-6FVM3G-L9BFLH-5TYH";
-    json * curl_return;
+    json curl_return;
+    std::string str_curl_return; 
 };
 
 RequestManager::RequestManager()
@@ -121,36 +122,53 @@ size_t RequestManager::write_cb(char *ptr, size_t size, size_t nmemb, void *user
 
 void RequestManager::getDataFromURL(std::string sid)
 {
-    CURL* curl = curl_easy_init();
-    std::string body = "";
-   
-    long status_code = 0;
-   // return "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s" % (satellite_id, api_key);
-    std::string s_url = "https://api.n2yo.com/rest/v1/satellite/tle/" + sid + "&apiKey=" + api_key;
+    try{
+        CURL* curl = curl_easy_init();
+        std::string body = "";
+    
+        long status_code = 0;
+    // return "https://api.n2yo.com/rest/v1/satellite/tle/%s&apiKey=%s" % (satellite_id, api_key);
+        std::string s_url = "https://api.n2yo.com/rest/v1/satellite/tle/" + sid + "&apiKey=" + api_key;
 
-    curl_easy_setopt(curl, CURLOPT_URL, s_url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &write_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_URL, s_url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &RequestManager::write_cb);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-    CURLcode res = curl_easy_perform(curl);
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status_code);
-    curl_easy_cleanup(curl);
+        CURLcode res = curl_easy_perform(curl);
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status_code);
+        curl_easy_cleanup(curl);
 
-    if(res != CURLE_OK || status_code != 200)
+        if(res != CURLE_OK || status_code != 200)
+        {
+            curl_easy_strerror(res);
+        } 
+        
+        std::cout << "beginning curl return " << std::endl;
+        //this->curl_return = json::parse(body); 
+        this->str_curl_return = body;
+        std::cout << str_curl_return << std::endl;
+
+        if(curl_return.contains("error")) printf("Error: %s\n",curl_return.at("error"));
+        try{
+            this->curl_return = json::parse(body);
+            std::cout << "json parse" << std::endl;
+        }catch(const nlohmann::json::parse_error& e)
+        {
+            std::cerr << "JSON parse error: " << e.what() << "\n";
+            std::cerr << "Raw response was: [" << body << "]\n";
+        }
+        
+    }catch (const std::exception& e)
     {
-        curl_easy_strerror(res);
+        std::cerr << e.what() << '\n';
     }
-    *curl_return = json::parse(body); 
-    if(curl_return->contains("error")) printf("Error: %s\n",curl_return->at("error"));
-    //return json::parse(body);
-
-    //returns a parsed JSON object - we then extract the values from n2yo's json value
+        //returns a parsed JSON object - we then extract the values from n2yo's json value
 }
 
 bool RequestManager::checksum()
 {
-    std::string z = this->curl_return->at("tle"); //we don't need to store a whole string, get rid of this when it works
+    std::string z = curl_return.at("tle"); //we don't need to store a whole string, get rid of this when it works
     std::string x = z.substr(0,69);
     std::string y = z.substr(72, 141);
 
