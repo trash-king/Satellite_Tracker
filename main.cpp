@@ -11,7 +11,11 @@
 #include "nlohmann/json.hpp"
 
 #include <curl/curl.h>
+
 #define  TLE_CHECKSUM_IDX         69
+#define  SAT_ID_LENGTH            5
+
+#define  TLE_PLACEHOLDER          "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
 using namespace nlohmann;
 
@@ -19,50 +23,8 @@ bool is_running  = true;
 
 struct TLE_Element
 {
-    TLE_Element(std::string t)
-    {
-    std::string x = t.substr(0,69);
-    std::string y = t.substr(72,141);
-
-    checksum(x, y);
-
-    this->epoch_year   = std::stod(x.substr(19, 1));
-    this->epoch_year   = std::stod(x.substr(21, 11));
-
-    this->inclination  = std::stod(y.substr(9,  7));
-    this->raan         = std::stod(y.substr(18, 7));
-    this->perigree     = std::stod(y.substr(35, 7));
-    this->anomaly      = std::stod(y.substr(44, 7));
-    this->eccentricity = std::stod(y.substr(27, 6));
-    this->mean_motion  = std::stod(y.substr(53, 10));
-    this->b_drag       = std::stod(y.substr(54, 7));
-    }
-
-    bool checksum(std::string x, std::string y)
-    {
-    int total = 0;
-    //todo, what should
-    for(int i = 0; i < TLE_CHECKSUM_IDX; i++)
-    {
-        if(std::isdigit(x[i])) total += x[i] - '0';
-        else if(std::isalpha(x[i]) || (x[i] == '+') || (x[i] == '.')) total += 0;
-        else if(x[i] == '-') total += 1; 
-    }
-    if((total % 10) == (x[TLE_CHECKSUM_IDX]))
-    {
-        total = 0;
-        for(auto j: y)
-        {
-            if(std::isdigit(j)) total += j - '0';
-            else if(std::isalpha(j) || (j == '+') || (j == '.')) total += 0;
-            else if(j == '-') total += 1;       
-        }   
-        if((total % 10) == (y[TLE_CHECKSUM_IDX])) return true;
-        else return false;
-    }else return false;
-
-    return false;
-    }
+    TLE_Element(std::string t);
+    public:
 
     double epoch_year;
     double epoch_day;
@@ -90,6 +52,23 @@ struct TLE_Element
     
     */
 };
+
+TLE_Element::TLE_Element(std::string t)
+{
+    std::string x = t.substr(0,69);
+    std::string y = t.substr(72,141);
+
+    this->epoch_year   = std::stod(x.substr(19, 1));
+    this->epoch_year   = std::stod(x.substr(21, 11));
+
+    this->inclination  = std::stod(y.substr(9,  7));
+    this->raan         = std::stod(y.substr(18, 7));
+    this->perigree     = std::stod(y.substr(35, 7));
+    this->anomaly      = std::stod(y.substr(44, 7));
+    this->eccentricity = std::stod(y.substr(27, 6));
+    this->mean_motion  = std::stod(y.substr(53, 10));
+    this->b_drag       = std::stod(y.substr(54, 7));
+}
 
 /*
     Epoch year and day- used for propogation time
@@ -119,6 +98,7 @@ class RequestManager
     size_t write_cb(char *ptr, size_t size, size_t nmemb, void *userdata);
     json get_sat_request(){return (*curl_return);}
     void getDataFromURL(std::string sid);
+    bool checksum();
     protected:
     
     private:
@@ -168,16 +148,48 @@ void RequestManager::getDataFromURL(std::string sid)
     //returns a parsed JSON object - we then extract the values from n2yo's json value
 }
 
+bool RequestManager::checksum()
+{
+    std::string z = this->curl_return->at("tle"); //we don't need to store a whole string, get rid of this when it works
+    std::string x = z.substr(0,69);
+    std::string y = z.substr(72, 141);
+
+    int total = 0;
+       
+    for(int i = 0; i < TLE_CHECKSUM_IDX; i++)
+    {
+        if(std::isdigit(x[i])) total += x[i] - '0';
+        else if(std::isalpha(x[i]) || (x[i] == '+') || (x[i] == '.')) total += 0;
+        else if(x[i] == '-') total += 1; 
+    }
+    if((total % 10) == (x[TLE_CHECKSUM_IDX]))
+    {
+        total = 0;
+        for(auto j: y)
+        {
+            if(std::isdigit(j)) total += j - '0';
+            else if(std::isalpha(j) || (j == '+') || (j == '.')) total += 0;
+            else if(j == '-') total += 1;       
+        }   
+        if((total % 10) == (y[TLE_CHECKSUM_IDX])) return true;
+        else return false;
+    }else return false;
+
+    return false;
+}
+
 RequestManager * request_manager = new RequestManager();
 extern RequestManager * request_manager;
 
 struct Entry
 {
-    public:
-    int  entry_id;
-    std::string satellite_name;
+    int entry_id;
     int satellite_id;
     int transactions_count;
+
+    TLE_Element tle = TLE_Element(TLE_PLACEHOLDER);
+
+    std::string satellite_name;
     std::string launch_number;
     std::string launch_year;
     std::string launch_piece;
@@ -192,44 +204,9 @@ struct Entry
     std::string ra;
     std::string declination;
     std::string timestamp;
-
-    TLE_Element tle;
-    std::string t_string; //we extract T-String from the tle element string.
-    //THere's a better way of doing this but I'm doing this for now
-/*
-    Entry(int id, std::string s_n, int s_i, std::string ln, std::string ly, std::string lp,
-          std::string ed, std::string ey, std::string bc, std::string rd, std::string lat, std::string log, std::string az, std::string el, std::string r, std::string dec, std::string tims, TLE_Element t) :
-          entry_id(id), satellite_name(s_n), satellite_id(s_i), launch_number(ln),
-          launch_year(ly), launch_piece(lp), epoch_day(ed), epoch_year(ey), ballistic_coefficient(bc),
-          radiation_drag(rd), latitude(lat), longitude(log), azimuth(az), elevation(el), ra(r), declination(dec), timestamp(tims), tle(t) {};
-*/
-    Entry(json j);
-    void populate_entry(std::string s);
-    void extract_t_string();
-    void from_json(const json& j, Entry& p);
-    json to_json() const;
 };
-
-json Entry::to_json() const {
-    return json{
-        {"satellite_id", satellite_id},
-        {"satellite_name", satellite_name},
-        {"launch_number", launch_number},
-        {"launch_year", launch_year},
-        {"launch_piece", launch_piece},
-        {"epoch_day", epoch_day},
-        {"ballistic_coefficient", ballistic_coefficient},
-        {"radiation_drag", radiation_drag},
-        {"latitude", latitude},
-        {"azimuth", azimuth},
-        {"elevation", elevation},
-        {"ra", ra},
-        {"declination", declination},
-        {"timestamp", timestamp}
-    };
-}
-
-void Entry::from_json(const json& j, Entry& p)
+/*
+void from_json(const json& j, Entry& p)
 {
     
     if(j.contains("error"))
@@ -245,30 +222,8 @@ void Entry::from_json(const json& j, Entry& p)
         x.at("tle").get_to(p.t_string);
     }
 }
+*/
 
-void Entry::extract_t_string()
-{
-
-}
-
-void Entry::populate_entry(std::string s)
-{
-    s = this->t_string;
-
-    this->launch_year = s.substr(9,2);
-    this->launch_number = s.substr(11,3);
-    this->launch_piece = s.substr(14,3);
-
-    this->epoch_year = s.substr(19,1);
-    this->epoch_day  = s.substr(21,11);
-
-    this->ballistic_coefficient = s.substr(33,10);
-    this->radiation_drag        = s.substr(53,8);
-    /*
-          self.ballistic_coefficient = launchData[33:43]
-        self.radiation_drag = launchData[53:61]
-    */
-}
 
 std::unordered_map<int, Entry>satellite_dictionary = {};
 
@@ -279,7 +234,7 @@ class SatelliteDictionary
     void readEntry(int entry);                                    //reads an entry from the dictionary
     Entry accessEntry(int entry);                         //accesses an object from the dictionary
     bool createEntry(std::string id);                    //creates a new entry entirely
-    
+    void populate_entry(Entry * entry);
     void propogate_tle(TLE_Element tle);    //makes the calls to orbital_math
     void displayJSON(json j);
     protected:
@@ -302,6 +257,25 @@ SatelliteDictionary::SatelliteDictionary(int ins)
     this->instance = ins;
     std::cout << "constructor called" << std::endl;
     generateSatCat();
+}
+
+void SatelliteDictionary::populate_entry(Entry * entry)
+{
+    std::string s = entry->tle.tle;
+
+    entry->launch_year = s.substr(9,2);
+    entry->launch_number = s.substr(11,3);
+    entry->launch_piece = s.substr(14,3);
+
+    entry->epoch_year = s.substr(19,1);
+    entry->epoch_day  = s.substr(21,11);
+
+    entry->ballistic_coefficient = s.substr(33,10);
+    entry->radiation_drag        = s.substr(53,8);
+    /*
+          self.ballistic_coefficient = launchData[33:43]
+        self.radiation_drag = launchData[53:61]
+    */
 }
 
 void SatelliteDictionary::propogate_tle(TLE_Element tle)
@@ -434,20 +408,32 @@ int main()
     std::string input = "";
     while(running)
     {
-        std::cout << "Enter NORAD satellite ID: " << std::endl;
-        std::cin >> input;
-        for(auto x: input)
-        {
-            if(!std::isdigit(x))
+        try{
+            std::cout << "Enter NORAD satellite ID: " << std::endl;
+            std::cin >> input;
+            for(auto x: input)
             {
-                std::cout << "Invalid ID" << std::endl;
-                input = "";
-                break;
+                if(!std::isdigit(x))
+                {
+                    std::cout << "Invalid ID" << std::endl;
+                    input = "";
+                    break;
+                }
             }
-        }
-        while(input.size() > 5) input.insert(0, 1, '0');
-
-       request_manager->getDataFromURL(input);
+            if(input.size() < SAT_ID_LENGTH)
+            {
+                while(input.size() < SAT_ID_LENGTH) input.insert(0, 1, '0');
+            }
+            std::cout << "getdatafromurl(input)\n" << std::endl;
+            request_manager->getDataFromURL(input);
+        }catch(const std::runtime_error& e)
+        {
+            std::cerr << "Error: " << e.what() << '\n';
+        }catch (...) 
+        {
+        // Catches EVERYTHING else (ints, custom non-std types, etc.)
+        std::cerr << "An unknown C++ exception occurred.\n";
+        }   
     }
     std::cout << "DEBUG TEST END" << std::endl;
 
