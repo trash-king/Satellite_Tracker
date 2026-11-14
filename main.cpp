@@ -280,6 +280,11 @@ SatelliteDictionary::SatelliteDictionary(int ins)
 void SatelliteDictionary::populate_entry(Entry * entry)
 {
     std::string s = entry->tle.tle;
+    if(s.empty())
+    {
+        std::cout << "Object " << entry->satellite_name << " - ID - " << entry->satellite_id << "has no current TLE data." << std::endl;
+        return;
+    }
 
     entry->launch_year = s.substr(9,2);
     entry->launch_number = s.substr(11,3);
@@ -298,6 +303,7 @@ void SatelliteDictionary::populate_entry(Entry * entry)
 
 void SatelliteDictionary::propogate_tle(TLE_Element tle)
 {
+    //entry point for actual math
     /*
     double radius = radius_of_curvature(tle.)
     */
@@ -323,6 +329,7 @@ bool SatelliteDictionary::createEntry(std::string id)
         return false;
     }else
     {
+        populate_entry(&new_entry);
         printf("New Entry %s added at position %d\n",id, cur_id);
         readEntry(cur_id);
         return true;
@@ -383,7 +390,6 @@ void SatelliteDictionary::generateSatCat()
     std::ifstream f("satcat.json");
     
 }
-
 SatelliteDictionary * d_tron = new SatelliteDictionary(1);
 
 class SatTracker
