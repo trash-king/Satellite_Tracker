@@ -12,8 +12,8 @@
 
 #include <curl/curl.h>
 
-#define  TLE_CHECKSUM_IDX         69
-#define  SAT_ID_LENGTH            5
+#define  TLE_CHECKSUM_IDX               69
+#define  SAT_ID_LENGTH                  5
 
 #define  TLE_PLACEHOLDER          "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
@@ -21,11 +21,15 @@ using namespace nlohmann;
 
 bool is_running  = true;
 
+void minsky(int * x, int *y)
+{
+    *x -= *y >> 4;
+    *y += *x >> 4;
+}
+
+
 struct TLE_Element
 {
-    TLE_Element(std::string t);
-    public:
-
     double epoch_year;
     double epoch_day;
     double inclination;
@@ -52,23 +56,6 @@ struct TLE_Element
     
     */
 };
-
-TLE_Element::TLE_Element(std::string t)
-{
-    std::string x = t.substr(0,69);
-    std::string y = t.substr(72,141);
-
-    this->epoch_year   = std::stod(x.substr(19, 1));
-    this->epoch_year   = std::stod(x.substr(21, 11));
-
-    this->inclination  = std::stod(y.substr(9,  7));
-    this->raan         = std::stod(y.substr(18, 7));
-    this->perigree     = std::stod(y.substr(35, 7));
-    this->anomaly      = std::stod(y.substr(44, 7));
-    this->eccentricity = std::stod(y.substr(27, 6));
-    this->mean_motion  = std::stod(y.substr(53, 10));
-    this->b_drag       = std::stod(y.substr(54, 7));
-}
 
 /*
     Epoch year and day- used for propogation time
@@ -201,13 +188,16 @@ extern RequestManager * request_manager;
 
 struct Entry
 {
+    public:
+    Entry(json j, int i);
+    double parse_tle_exp(std::string s);
+
+    TLE_Element tle;
     int entry_id;
     int satellite_id;
+    std::string satellite_name;
     int transactions_count;
 
-    TLE_Element tle = TLE_Element(TLE_PLACEHOLDER);
-
-    std::string satellite_name;
     std::string launch_number;
     std::string launch_year;
     std::string launch_piece;
@@ -223,6 +213,43 @@ struct Entry
     std::string declination;
     std::string timestamp;
 };
+
+Entry::Entry(json j, int i)
+{
+    if(j.contains("info"))
+    {
+        satellite_name = j.at("info").at("satname").get<std::string>();
+        satellite_id   = j.at("info").at("satid").get<int>();
+        entry_id       = i;
+        if(!j.at("info").at("tle").empty())
+        {
+            std::string t = j.at("tle").get<std::string>();
+            size_t nl = t.find('\n');
+            std::string x = t.substr(0, nl);
+            std::string y = t.substr(nl + 1);
+
+            int yy = std::stoi(x.substr(18, 2));
+            tle.epoch_year = (yy < 57) ? 2000 + yy : 1900 + yy;
+            tle.epoch_day  = std::stod(x.substr(20, 12));
+            tle.b_drag     = parse_tle_exp(x.substr(53, 8));
+
+            tle.inclination  = std::stod(y.substr(8, 8));
+            tle.raan         = std::stod(y.substr(17, 8));
+            tle.perigree     = std::stod(y.substr(34, 8));
+            tle.anomaly      = std::stod(y.substr(43, 8));
+            tle.eccentricity = std::stod("0." + y.substr(26, 7));
+            tle.mean_motion  = std::stod(y.substr(52, 11));
+        }
+    }
+}
+
+double Entry::parse_tle_exp(std::string s)
+{
+    s.erase(0, s.find_first_not_of(' '));
+    double mantissa = std::stod(s.substr(0, s.size() - 2)) * 1e-5;
+    int    exponent = std::stoi(s.substr(s.size() - 2));
+    return mantissa * std::pow(10.0, exponent);
+}
 /*
 void from_json(const json& j, Entry& p)
 {
@@ -255,6 +282,7 @@ class SatelliteDictionary
     void populate_entry(Entry * entry);
     void propogate_tle(TLE_Element tle);    //makes the calls to orbital_math
     void displayJSON(json j);
+    void viewAllEntries();
     protected:
     int instance;
 
@@ -301,6 +329,11 @@ void SatelliteDictionary::populate_entry(Entry * entry)
     */
 }
 
+void SatelliteDictionary::viewAllEntries()
+{
+    std::cout << "null" << std::endl;
+}
+
 void SatelliteDictionary::propogate_tle(TLE_Element tle)
 {
     //entry point for actual math
@@ -318,10 +351,14 @@ bool SatelliteDictionary::createEntry(std::string id)
         return false;
     }
     request_manager->getDataFromURL(id);
-    Entry new_entry(request_manager->get_sat_request());
-    
     int cur_id = satellite_dictionary.size() + 1;
 
+    std::cout << "get data from url called" << std::endl;
+    
+    Entry new_entry(request_manager->get_sat_request(), cur_id);
+    std::cout << "new entry called" << std::endl;
+    
+try{
     auto [iterator, success] = satellite_dictionary.emplace(cur_id, new_entry);
     if(!success)
     {
@@ -334,10 +371,13 @@ bool SatelliteDictionary::createEntry(std::string id)
         readEntry(cur_id);
         return true;
     }
-
-    printf("New Entry %s failed for unknown reason.\n",id);
+}catch(const std::runtime_error& e)
+{
+    std::cerr << e.what() << std::endl;
+    printf("New Entry %s failed for unknown reason.\n",id.c_str());
+    return false;    
+}
     return false;
-    
 }
 
 void SatelliteDictionary::readEntry(int entry)
@@ -426,38 +466,66 @@ void SatTracker::selectSatellite()
 
 SatTracker * s_tron              = new SatTracker();
 
+#define CMD_ENTER_ID            1
+#define CMD_VIEW_DICT           2
+#define CMD_VIEW_ENTRY          3
+#define CMD_CLOSE_PROGRAM       4
+#define CMD_VIEW_EARTH          5
+
+
 int main()
 {
     bool running = true;
     std::string input = "";
+    int cmd;
+    int input;
     while(running)
     {
-        try{
-            std::cout << "Enter NORAD satellite ID: " << std::endl;
-            std::cin >> input;
-            for(auto x: input)
+            restart_loop:
+            std::cout << "Awaiting Command..." << std::endl;
+            std::cin >> cmd;
+            switch (cmd)
             {
-                if(!std::isdigit(x))
-                {
-                    std::cout << "Invalid ID" << std::endl;
-                    input = "";
+                case CMD_ENTER_ID:    
+                    std::cout << "Enter NORAD satellite ID: " << std::endl;
+                    std::cin >> input;
+                    for(auto x: input)
+                    {
+                        if(!std::isdigit(x))
+                        {
+                            std::cout << "Invalid ID" << std::endl;
+                            input = "";
+                            break;
+                        }
+                    }
+                    if(input.size() < SAT_ID_LENGTH)
+                    {
+                        while(input.size() < SAT_ID_LENGTH) input.insert(0, 1, '0');
+                    }
+                    std::cout << "getdatafromurl(input)\n" << std::endl;
+                    d_tron->createEntry(input);      
                     break;
-                }
+                case CMD_VIEW_DICT:     
+                    d_tron->viewAllEntries();
+                    break;
+                case CMD_VIEW_ENTRY:  
+                    std::cout << "Enter NORAD satellite ID: " << std::endl;
+                    std::cin >> input;
+                    d_tron->readEntry(input);      
+                    break;
+                case CMD_CLOSE_PROGRAM:
+                    std::cout << "Closing program" << std::endl;     
+                    running = false;
+                    break;
+                case CMD_VIEW_EARTH:     
+                    std::cout << "Under construction!" << std::endl;
+                    goto restart_loop;
+                    break;
+                default:
+                    std::cout << "Invalid Command Entered" << std::endl;
+                    goto restart_loop;
+                    break;
             }
-            if(input.size() < SAT_ID_LENGTH)
-            {
-                while(input.size() < SAT_ID_LENGTH) input.insert(0, 1, '0');
-            }
-            std::cout << "getdatafromurl(input)\n" << std::endl;
-            request_manager->getDataFromURL(input);
-        }catch(const std::runtime_error& e)
-        {
-            std::cerr << "Error: " << e.what() << '\n';
-        }catch (...) 
-        {
-        // Catches EVERYTHING else (ints, custom non-std types, etc.)
-        std::cerr << "An unknown C++ exception occurred.\n";
-        }   
     }
     std::cout << "DEBUG TEST END" << std::endl;
 
