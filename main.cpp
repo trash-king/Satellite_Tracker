@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <iostream>
 #include <ostream>
 #include <istream>
@@ -5,13 +8,18 @@
 #include <fstream>
 #include <stdexcept>
 #include <cctype>
+#include <cstdio>
 
+#include <SDL2/SDL.h>
+
+#include "planet_generator.h"
 #include "orbital_math.h"
+#include "orbit_generator.h"
 #include "SGP4.h"
 #include "nlohmann/json.hpp"
 
 #include <curl/curl.h>
-
+#include <GL/glu.h>
 #define  TLE_CHECKSUM_IDX               69
 #define  SAT_ID_LENGTH                  5
 
@@ -20,6 +28,7 @@
 using namespace nlohmann;
 
 bool is_running  = true;
+std::FILE* erroroutput = fopen("D:/ProgrammingProjects/Satellite_Tracker/error.txt", "w");
 
 void minsky(int * x, int *y)
 {
@@ -27,7 +36,7 @@ void minsky(int * x, int *y)
     *y += *x >> 4;
 }
 
-
+//c:\users\gpepi\appdata\local\programs\python\python39\python.exe -m pip install --upgrade pip
 struct TLE_Element
 {
     double epoch_year;
@@ -283,13 +292,16 @@ class SatelliteDictionary
     void propogate_tle(TLE_Element tle);    //makes the calls to orbital_math
     void displayJSON(json j);
     void viewAllEntries();
+    void viewEntry(int entry);
     protected:
     int instance;
 
     std::vector<Entry> user_satcat;
     TLE_Element * current_element = nullptr;            //calls to Orbital Math occur one tle call at a time, we don't need an array of TLE's but one which is constantly updated.
 
-    std::unordered_map<TLE_Element*, int> user_satellite_map;   //this contains all recently tracked objects,sorted by ID and most recently updated tle.
+    std::unordered_map<int, Entry>satellite_dictionary = {};
+    std::vector<Entry*> fast_satellite_dictionary;          //fast_satellite_dictionary is pointers to unordered_map entries;
+
 
     json satcat;
     private:
@@ -332,6 +344,13 @@ void SatelliteDictionary::populate_entry(Entry * entry)
 void SatelliteDictionary::viewAllEntries()
 {
     std::cout << "null" << std::endl;
+}
+
+void SatelliteDictionary::viewEntry(int entry)
+{
+    Entry e = satellite_dictionary.at(entry);
+    std::cout << " NAME: " << e.satellite_name << " ID: " << e.satellite_id << "LAUNCH YEAR: " << e.launch_year << std::endl;
+    std::cout << " LATITUDE: " << e.latitude << "LONGITUDE: " << e.longitude << std::endl; 
 }
 
 void SatelliteDictionary::propogate_tle(TLE_Element tle)
@@ -466,21 +485,120 @@ void SatTracker::selectSatellite()
 
 SatTracker * s_tron              = new SatTracker();
 
+//float radius, unsigned int rings, unsigned int sectors
 #define CMD_ENTER_ID            1
 #define CMD_VIEW_DICT           2
 #define CMD_VIEW_ENTRY          3
 #define CMD_CLOSE_PROGRAM       4
 #define CMD_VIEW_EARTH          5
 
-
-int main()
+void display()
 {
+    if (glViewport == nullptr) std::fprintf(stderr, "glViewport not loaded!\n");
+    try{
+        int const win_width = WINDOW_WIDTH;
+        int const win_height = WINDOW_HEIGHT;
+        float const win_aspect = (float)win_width / (float)win_height;
+
+        glViewport(0, 0, win_width, win_height);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluPerspective(45, win_aspect, 1, 10);
+
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+    #if DRAW_WIREFRAME
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    #endif
+    }
+    catch(const std::exception& e)
+    {
+        std::fputs(e.what(), erroroutput);
+        std::fflush(erroroutput);
+        std::fprintf(stderr, "%s\n", e.what());
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    if (!erroroutput) {
+        std::perror("Failed to open file");
+        return 1;
+    }else{
+        std::fputs("File write successful", erroroutput);
+        std::fflush(erroroutput);
+    }
+
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) 
+    {
+        std::fputs("SDL_Init failed", erroroutput);
+        std::fflush(erroroutput);
+        std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_Window* window = SDL_CreateWindow(
+        "Placeholder", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        WINDOW_HEIGHT, WINDOW_WIDTH, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);  
+        
+    SDL_GLContext ctx = SDL_GL_CreateContext(window);
+    if (!ctx) { /* handle error */ return 1; }
+
+    // 5. Load OpenGL function pointers (must come AFTER the context exists)
+    if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
+        std::fprintf(stderr, "Failed to load OpenGL functions\n");
+        return 1;
+    }
+    std::printf("GL version: %s\n", glGetString(GL_VERSION));
+
+    try{
+        glClearColor(0.1f, 0.2f, 0.4f, 1.0f);
+        glColor3f(1.0f, 0.0f, 0.0f);   // solid red
+
+        if (!window) { /* handle error */ return 1; }
+        printf("Beginning sphere generation:\n");
+        PlanetGenerator * earth          = new PlanetGenerator(1, 12, 24); // tweak to find the best looking sphere
+        earth->outputAsText();
+        display();
+
+        earth->draw(0, 0, -5);
+        SDL_GL_SwapWindow(window);
+    }catch(const std::exception& e)
+    {
+        std::fputs(e.what(), erroroutput);
+        std::fflush(erroroutput);
+        std::fprintf(stderr, "%s\n", e.what());
+    }
+    catch(...)
+    {
+        std::fputs(SDL_GetError(), erroroutput);
+        std::fflush(erroroutput);
+        std::fprintf(stderr, "SDL Other Error: %s\n", SDL_GetError());
+    }
+
+    SDL_GL_SetSwapInterval(1);
+    glEnable(GL_DEPTH_TEST);
+
     bool running = true;
     std::string input = "";
     int cmd;
-    int input;
+    int entry;
     while(running)
     {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) 
+        {
+            if (e.type == SDL_QUIT) running = false;
+        }
+
             restart_loop:
             std::cout << "Awaiting Command..." << std::endl;
             std::cin >> cmd;
@@ -488,7 +606,7 @@ int main()
             {
                 case CMD_ENTER_ID:    
                     std::cout << "Enter NORAD satellite ID: " << std::endl;
-                    std::cin >> input;
+                    std::cin >> entry;
                     for(auto x: input)
                     {
                         if(!std::isdigit(x))
@@ -511,7 +629,7 @@ int main()
                 case CMD_VIEW_ENTRY:  
                     std::cout << "Enter NORAD satellite ID: " << std::endl;
                     std::cin >> input;
-                    d_tron->readEntry(input);      
+                    d_tron->readEntry(entry);      
                     break;
                 case CMD_CLOSE_PROGRAM:
                     std::cout << "Closing program" << std::endl;     
@@ -529,5 +647,9 @@ int main()
     }
     std::cout << "DEBUG TEST END" << std::endl;
 
+    std::fclose(erroroutput);
+    SDL_GL_DeleteContext(ctx);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
     return 0;
 }

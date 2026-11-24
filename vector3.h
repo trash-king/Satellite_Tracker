@@ -27,13 +27,3 @@ struct vector3{
     }
 
 };
-
-double magnitude(vector3 vec)
-{
-    return std::sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
-}
-
-vector3 scalar_division(vector3 numer, double denom)
-{
-    return vector3(numer.x / denom, numer.y/denom, numer.z/denom);
-}

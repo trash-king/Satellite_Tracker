@@ -31,6 +31,9 @@ const double step           = 15.0;         //step size for Runge-Kutta equation
 
 //e2≈0.00669438
 
+double magnitude(vector3 vec);
+vector3 scalar_division(vector3 numer, double denom);
+
 double time_since_j2000(double unix_seconds);
 double gmst(double unix_seconds);
 double radius_of_curvature(double latitude);
@@ -43,3 +46,6 @@ vector3 compute_acceleration(vector3 rECI);
 vector6 derivative(vector6 state);
 vector6 runge_kutta(vector6 d, double h);
 std::vector<vector6> calculate_trajectory(vector6 vec, double duration);
+
+
+

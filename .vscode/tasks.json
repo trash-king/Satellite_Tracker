@@ -7,10 +7,21 @@
             "args": [
                 "-fdiagnostics-color=always",
                 "-g",
-                "${file}",
+                "${workspaceFolder}/main.cpp",
+                "${workspaceFolder}/planet_generator.cpp",
+                "${workspaceFolder}/orbital_math.cpp",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
-                "-lcurl"
+                "${workspaceFolder}/src/glad.c",
+                "-I${workspaceFolder}/include",
+                "-IC:/SDL2/include",
+                "-LC:/SDL2/lib",
+                "-lcurl",
+                "-lmingw32",
+                "-lSDL2main",
+                "-lSDL2",
+                "-lopengl32",
+                "-lglu32"
             ],
             "options": {
                 "cwd": "D:\\msys64\\mingw64\\bin"

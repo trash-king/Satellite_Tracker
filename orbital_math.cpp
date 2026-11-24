@@ -1,7 +1,6 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
-#include "vector3.h"
 #include "orbital_math.h"
 #define ONLY_C_LOCALE   1       //fixes a bug in the date/date.h library      
 #include "date/date.h"
@@ -10,6 +9,16 @@ using namespace std::chrono;
 
 //GMST - Greenwich Mean Sidereal Time
 //j2000 can be delineated by either seconds or days since January 1st, 2000.
+
+double magnitude(vector3 vec)
+{
+    return std::sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+}
+
+vector3 scalar_division(vector3 numer, double denom)
+{
+    return vector3(numer.x / denom, numer.y/denom, numer.z/denom);
+}
 
 double time_since_j2000(double unix_seconds)
 {
